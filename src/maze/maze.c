@@ -7,7 +7,7 @@
 // Self-contained: this file carries only the helper code the maze actually
 // uses (asset loading, map handling, the input/event loop).
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,7 @@
 // string; the caller must free() it.
 static char *asset_path(const char *relative)
 {
-    char *base = SDL_GetBasePath();
+    const char *base = SDL_GetBasePath(); // owned by SDL; do not free
     char *result = NULL;
     if (base)
     {
@@ -38,7 +38,6 @@ static char *asset_path(const char *relative)
             }
             free(path);
         }
-        SDL_free(base);
     }
     if (!result)
     {
@@ -120,14 +119,15 @@ static void map_load(Map *map, char *file_path)
     map_post_load(map);
 }
 
-static void ensure(int return_code)
+// Log an SDL error when a bool-returning SDL call reports failure.
+static void ensure(bool ok)
 {
-    if (return_code != 0)
-        printf("error initializing SDL: %s\n", SDL_GetError());
+    if (!ok)
+        printf("SDL error: %s\n", SDL_GetError());
 }
 
-static int mx, my;
-static Uint32 mbuttons;
+static float mx, my;
+static SDL_MouseButtonFlags mbuttons;
 static int mouse_left_down, mouse_left_just_down, mouse_left_down_previous = 0;
 
 // Pump SDL events and update input/maze state. Returns 0 to quit, 1 to keep
@@ -146,20 +146,20 @@ static int events(void)
     while (SDL_PollEvent(&event))
     {
 
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)
             return 0;
 
         switch (event.type)
         {
 
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             return 0;
 
-        case SDL_KEYDOWN:
+        case SDL_EVENT_KEY_DOWN:
 
             int tx = px;
             int ty = py;
-            switch (event.key.keysym.sym)
+            switch (event.key.key)
             {
             case SDLK_DOWN:
                 ty++;
@@ -200,9 +200,7 @@ int main(int argc, char *argv[])
     int view_width = 400, view_height = 300;
     SDL_Window *window;
     SDL_Renderer *renderer;
-    ensure(SDL_CreateWindowAndRenderer(view_width, view_height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE, &window, &renderer));
-
-    SDL_SetWindowTitle(window, "mini-maze with (lib)SDL2");
+    ensure(SDL_CreateWindowAndRenderer("mini-maze with (lib)SDL3", view_width, view_height, SDL_WINDOW_RESIZABLE, &window, &renderer));
 
     char *filename[4] = {
         "assets/P.bmp",
@@ -234,9 +232,8 @@ int main(int argc, char *argv[])
 
         if (mouse_left_down)
         {
-            int tx, ty;
-            tx = mx / tile_size;
-            ty = my / tile_size;
+            int tx = (int)mx / tile_size;
+            int ty = (int)my / tile_size;
             if (tx < map.width && ty < map.height)
             {
                 if (
@@ -279,8 +276,8 @@ int main(int argc, char *argv[])
                     map_tile_type = 3;
                     break;
                 }
-                SDL_Rect dst_rect = {xi * tile_size, yi * tile_size, tile_size, tile_size};
-                SDL_RenderCopy(renderer, texture[map_tile_type], NULL, &dst_rect);
+                SDL_FRect dst_rect = {xi * tile_size, yi * tile_size, tile_size, tile_size};
+                SDL_RenderTexture(renderer, texture[map_tile_type], NULL, &dst_rect);
             }
 
         SDL_RenderPresent(renderer);
@@ -291,7 +288,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < count; i++)
     {
         SDL_DestroyTexture(texture[i]);
-        SDL_FreeSurface(image[i]);
+        SDL_DestroySurface(image[i]);
     }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

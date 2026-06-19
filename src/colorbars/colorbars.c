@@ -5,14 +5,14 @@
 // Lean and self-contained: ensure(), a minimal quit/escape event loop, plus the
 // in_rect() hit-test and draw_colors() helper this example uses.
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <stdio.h>
 
-// Log an SDL error when return_code is non-zero.
-static void ensure(int return_code)
+// Log an SDL error when a bool-returning SDL call reports failure.
+static void ensure(bool ok)
 {
-    if (return_code != 0)
-        printf("error initializing SDL: %s\n", SDL_GetError());
+    if (!ok)
+        printf("SDL error: %s\n", SDL_GetError());
 }
 
 // Pump SDL events. Returns 0 to quit (window closed or Escape), 1 otherwise.
@@ -21,15 +21,15 @@ static int events(void)
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
-        if (event.type == SDL_QUIT)
+        if (event.type == SDL_EVENT_QUIT)
             return 0;
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)
             return 0;
     }
     return 1;
 }
 
-static int in_rect(int x, int y, struct SDL_Rect *r)
+static int in_rect(float x, float y, const SDL_FRect *r)
 {
     return (x >= r->x) && (y >= r->y) &&
            (x < r->x + r->w) && (y < r->y + r->h);
@@ -50,14 +50,14 @@ static int rgb_size = sizeof rgb / sizeof rgb[0];
 static void draw_colors(SDL_Renderer *renderer, int i_current, int view_width, int view_height)
 {
 
-    SDL_Rect colorBar;
+    SDL_FRect colorBar;
     colorBar.x = 0;
     colorBar.y = 0;
     colorBar.w = view_width / rgb_size;
     colorBar.h = view_height;
 
     int *color;
-    SDL_Rect rectangle;
+    SDL_FRect rectangle;
 
     int background_color[] = {50, 50, 50};
     for (int i = -1; i <= i_current; i++)
@@ -65,7 +65,7 @@ static void draw_colors(SDL_Renderer *renderer, int i_current, int view_width, i
         if (i == -1)
         {
             color = background_color;
-            SDL_Rect view = {.x = 0, .y = 0, .w = view_width, .h = view_height};
+            SDL_FRect view = {.x = 0, .y = 0, .w = view_width, .h = view_height};
             rectangle = view;
         }
         else
@@ -81,14 +81,14 @@ static void draw_colors(SDL_Renderer *renderer, int i_current, int view_width, i
 
 int main(int argc, char *argv[])
 {
-    ensure(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER));
+    ensure(SDL_Init(SDL_INIT_VIDEO));
     int view_width = 400, view_height = 300;
     SDL_Window *window;
     SDL_Renderer *renderer;
-    ensure(SDL_CreateWindowAndRenderer(view_width, view_height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE, &window, &renderer));
+    ensure(SDL_CreateWindowAndRenderer("colorbars", view_width, view_height, SDL_WINDOW_RESIZABLE, &window, &renderer));
 
     int i = -1;
-    int lastTime = SDL_GetTicks(), currentTime;
+    Uint64 lastTime = SDL_GetTicks(), currentTime;
     while (events())
     {
 
@@ -97,18 +97,18 @@ int main(int argc, char *argv[])
         draw_colors(renderer, i, view_width, view_height);
 
         int button_color[] = {0, 50, 50};
-        SDL_Rect button = {.x = 10, .y = 10, .w = 50, .h = 50};
+        SDL_FRect button = {.x = 10, .y = 10, .w = 50, .h = 50};
         SDL_SetRenderDrawColor(renderer, button_color[0], button_color[1], button_color[2], 255);
         SDL_RenderFillRect(renderer, &button);
 
-        int x, y;
-        Uint32 buttons;
+        float x, y;
+        SDL_MouseButtonFlags buttons;
         SDL_PumpEvents();
         buttons = SDL_GetMouseState(&x, &y);
         if ((buttons & SDL_BUTTON_LMASK) != 0 && in_rect(x, y, &button))
         {
             SDL_Event quit_event;
-            quit_event.type = SDL_QUIT;
+            quit_event.type = SDL_EVENT_QUIT;
             SDL_PushEvent(&quit_event);
         }
 
