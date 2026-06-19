@@ -5,8 +5,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# The maze sources use the SDL2 API (#include <SDL2/SDL.h>).
+# The example sources use the SDL2 API (#include <SDL2/SDL.h>).
 find_package(SDL2 REQUIRED)
 
-add_executable(maze src/maze/maze.c)
-target_link_libraries(maze PRIVATE SDL2::SDL2)
+# Each example is fully self-contained in src/<app>/<app>.c.
+#   maze       : tile/BMP maze game (needs assets/)
+#   animation  : two animated translucent rectangles
+#   colorbars  : cycling color bars with a quit button
+foreach(app maze animation colorbars)
+  add_executable(${app} src/${app}/${app}.c)
+  target_link_libraries(${app} PRIVATE SDL2::SDL2)
+endforeach()
